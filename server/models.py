@@ -4,6 +4,7 @@ from sqlalchemy.orm import validates
 
 from datetime import date as date_type
 
+from sqlalchemy.ext.associationproxy import association
 convention = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -72,6 +73,15 @@ class Workout(db.Model):
     notes = db.Column(db.Text, nullable=True)
 
 
+    workout_exercises = db.relationship(
+        "WorkoutExercise",
+        back_populates="workout",
+        cascade="all, delete-orphan",
+    )
+    exercises = association_proxy("workout_exercises", "exercise")
+
+
+
     @validates("duration_minutes")
     def validate_duration(self, key, value):
         if value is None:
@@ -89,5 +99,33 @@ class Workout(db.Model):
             raise ValueError("date must be a valid date (YYYY-MM-DD).")
         return value
     def __repr__(self):
-        return f"<Workout {self.id} {sel.date}>"
+        return f"<Workout {self.id} {self.date}>"
+
+
+class WorkoutExercise(db.Model):
+    __tablename__ = "workout_exercises"
+
+    __table_args__ = (
+        CheckConstraint("reps IS NULL OR reps > 0", name="reps_positive"),
+        CheckConstraint("sets IS NULL OR sets > 0", name="sets_positive"),
+        CheckConstraint(
+            "duration_seconds IS NULL OR duration_seconds >= 0",
+            name="duration_seconds_nonnegative",
+
+        ),
+        UniqueConstraint("workout_id", "exercise_id", name="unique_workout_exercise"),
+
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    workout_id = db.Column(db.Integer, db.ForeignKey("workout.id"), nullable=False)
+    exercise_id = db.Column(db.Integer, db.ForeignKey("exercise.id"), nullable=False)
+    reps = db.Column(db.Integer, nullable=True)
+    sets = db.Column(db.Integer, nullable=True)
+    duration_seconds = db.Column(db.Integer, nullable=True)
+
+
+    workout = db.relationship("Workout", back_populates="workout_exercises")
+    exercise = db.relationship("Exercise", back_populates="workout_exercises")
     
+            
